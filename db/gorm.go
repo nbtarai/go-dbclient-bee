@@ -125,11 +125,18 @@ func (c *ImplTxGormClient) ExecTx(ctx context.Context, f func(ctx context.Contex
 	return r, nil
 }
 
-func NewMySQLClient(username string, password string, host string, dbname string) *ImplGormClient {
-	return &ImplGormClient{
+func NewGormClientWithMySQL(username string, password string, host string, dbname string) *GormClient {
+	impl := &ImplGormClient{
 		connectFn: func() (*gorm.DB, error) {
 			return ConnectMySQL(username, password, host, dbname)
 		},
+	}
+	return &GormClient{
+		Connect:      impl.Connect,
+		Close:        impl.Close,
+		Exec:         impl.Exec,
+		ExecTx:       impl.ExecTx,
+		ExecTxClient: impl.ExecTxClient,
 	}
 }
 
