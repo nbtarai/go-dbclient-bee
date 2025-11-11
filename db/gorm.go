@@ -138,12 +138,14 @@ func ConnectMySQL(username string, password string, host string, dbname string) 
 	q.Set("charset", "utf8mb4")
 	q.Set("parseTime", "True")
 	q.Set("loc", "Asia/Tokyo")
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?%s", username, password, host, dbname, q.Encode())
-	fmt.Println(dsn)
+
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
+
 	return db, nil
 }
 
@@ -158,10 +160,12 @@ func GormExec[T any](ctx context.Context, client *GormClient, fn func(ctx contex
 	if err != nil {
 		return nil, err
 	}
+
 	result, ok := r.(*T)
 	if !ok {
 		panic("mismatched result type.")
 	}
+
 	return result, nil
 }
 
@@ -176,10 +180,12 @@ func GormExecTx[T any](ctx context.Context, client *GormClient, fn func(ctx cont
 	if err != nil {
 		return nil, err
 	}
+
 	result, ok := r.(*T)
 	if !ok {
 		panic("mismatched result type.")
 	}
+
 	return result, nil
 }
 
@@ -194,9 +200,11 @@ func GormExecTxClient[T any](ctx context.Context, client *GormClient, fn func(ct
 	if err != nil {
 		return nil, err
 	}
+
 	result, ok := r.(*T)
 	if !ok {
 		panic("mismatched result type.")
 	}
+
 	return result, nil
 }
