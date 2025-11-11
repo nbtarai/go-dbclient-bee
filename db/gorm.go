@@ -96,6 +96,10 @@ func (c *ImplGormClient) ExecTxClient(ctx context.Context, f func(ctx context.Co
 
 type TxGormClient GormClient
 
+func (tx *TxGormClient) AsClient() *GormClient {
+	return (*GormClient)(tx)
+}
+
 type ImplTxGormClient struct {
 	tx *gorm.DB
 }

@@ -12,8 +12,8 @@ import (
 type BunClient struct {
 	Connect      func() error
 	Close        func() error
-	Exec         func(ctx context.Context, f func(ctx context.Context, db *bun.DB) (any, error)) (any, error)
-	ExecTx       func(ctx context.Context, f func(ctx context.Context, tx bun.Tx) (any, error)) (any, error)
+	Exec         func(ctx context.Context, f func(ctx context.Context, db bun.IDB) (any, error)) (any, error)
+	ExecTx       func(ctx context.Context, f func(ctx context.Context, tx bun.IDB) (any, error)) (any, error)
 	ExecTxClient func(ctx context.Context, f func(ctx context.Context, txClient *TxBunClient) (any, error)) (any, error)
 }
 
@@ -43,7 +43,7 @@ func (c *ImplBunClient) Close() error {
 	return nil
 }
 
-func (c *ImplBunClient) Exec(ctx context.Context, f func(ctx context.Context, db *bun.DB) (any, error)) (any, error) {
+func (c *ImplBunClient) Exec(ctx context.Context, f func(ctx context.Context, db bun.IDB) (any, error)) (any, error) {
 	r, err := f(ctx, c.db)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (c *ImplBunClient) Exec(ctx context.Context, f func(ctx context.Context, db
 	return r, nil
 }
 
-func (c *ImplBunClient) ExecTx(ctx context.Context, f func(ctx context.Context, tx bun.Tx) (any, error)) (any, error) {
+func (c *ImplBunClient) ExecTx(ctx context.Context, f func(ctx context.Context, tx bun.IDB) (any, error)) (any, error) {
 	var result any
 	err := c.db.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
 		r, err := f(ctx, tx)
@@ -74,7 +74,11 @@ func (c *ImplBunClient) ExecTxClient(ctx context.Context, f func(ctx context.Con
 			tx: tx,
 		}
 		txClient := &TxBunClient{
-			ExecTx: impl.ExecTx,
+			Connect:      impl.Connect,
+			Close:        impl.Close,
+			Exec:         impl.Exec,
+			ExecTx:       impl.ExecTx,
+			ExecTxClient: impl.ExecTxClient,
 		}
 
 		r, err := f(ctx, txClient)
@@ -92,8 +96,12 @@ func (c *ImplBunClient) ExecTxClient(ctx context.Context, f func(ctx context.Con
 
 type TxBunClient BunClient
 
+func (tx *TxBunClient) AsClient() *BunClient {
+	return (*BunClient)(tx)
+}
+
 type ImplTxBunClient struct {
-	tx bun.Tx
+	tx bun.IDB
 }
 
 func (c *ImplTxBunClient) Connect() error {
@@ -104,7 +112,7 @@ func (c *ImplTxBunClient) Close() error {
 	panic("not supported")
 }
 
-func (c *ImplTxBunClient) Exec(ctx context.Context, f func(ctx context.Context, db *bun.DB) (any, error)) (any, error) {
+func (c *ImplTxBunClient) Exec(ctx context.Context, f func(ctx context.Context, db bun.IDB) (any, error)) (any, error) {
 	panic("not supported")
 }
 
@@ -112,7 +120,7 @@ func (c *ImplTxBunClient) ExecTxClient(ctx context.Context, f func(ctx context.C
 	panic("not supported")
 }
 
-func (c *ImplTxBunClient) ExecTx(ctx context.Context, f func(ctx context.Context, tx bun.Tx) (any, error)) (any, error) {
+func (c *ImplTxBunClient) ExecTx(ctx context.Context, f func(ctx context.Context, tx bun.IDB) (any, error)) (any, error) {
 	r, err := f(ctx, c.tx)
 	if err != nil {
 		return nil, err
@@ -146,8 +154,8 @@ func NewBunClientWithMySQL(username string, password string, host string, dbname
 	}
 }
 
-func BunExec[T any](ctx context.Context, client *BunClient, fn func(ctx context.Context, db *bun.DB) (*T, error)) (*T, error) {
-	r, err := client.Exec(ctx, func(ctx context.Context, db *bun.DB) (any, error) {
+func BunExec[T any](ctx context.Context, client *BunClient, fn func(ctx context.Context, db bun.IDB) (*T, error)) (*T, error) {
+	r, err := client.Exec(ctx, func(ctx context.Context, db bun.IDB) (any, error) {
 		r, err := fn(ctx, db)
 		if err != nil {
 			return nil, err
@@ -166,8 +174,8 @@ func BunExec[T any](ctx context.Context, client *BunClient, fn func(ctx context.
 	return result, nil
 }
 
-func BunExecTx[T any](ctx context.Context, client *BunClient, fn func(ctx context.Context, tx bun.Tx) (*T, error)) (*T, error) {
-	r, err := client.ExecTx(ctx, func(ctx context.Context, tx bun.Tx) (any, error) {
+func BunExecTx[T any](ctx context.Context, client *BunClient, fn func(ctx context.Context, tx bun.IDB) (*T, error)) (*T, error) {
+	r, err := client.ExecTx(ctx, func(ctx context.Context, tx bun.IDB) (any, error) {
 		r, err := fn(ctx, tx)
 		if err != nil {
 			return nil, err
