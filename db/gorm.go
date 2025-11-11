@@ -2,8 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
-	"net/url"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -57,14 +55,15 @@ func (c *ImplGormClient) Exec(ctx context.Context, f func(ctx context.Context, d
 
 func (c *ImplGormClient) ExecTx(ctx context.Context, f func(ctx context.Context, tx *gorm.DB) (any, error)) (any, error) {
 	var result any
-	if err := c.db.Transaction(func(tx *gorm.DB) error {
+	err := c.db.Transaction(func(tx *gorm.DB) error {
 		r, err := f(ctx, tx)
 		if err != nil {
 			return err
 		}
 		result = r
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -73,15 +72,15 @@ func (c *ImplGormClient) ExecTx(ctx context.Context, f func(ctx context.Context,
 func (c *ImplGormClient) ExecTxClient(ctx context.Context, f func(ctx context.Context, txClient *TxGormClient) (any, error)) (any, error) {
 	var result any
 	if err := c.db.Transaction(func(tx *gorm.DB) error {
-		client := &ImplTxGormClient{
+		impl := &ImplTxGormClient{
 			tx: tx,
 		}
 		txClient := &TxGormClient{
-			Connect:      client.Connect,
-			Close:        client.Close,
-			Exec:         client.Exec,
-			ExecTx:       client.ExecTx,
-			ExecTxClient: client.ExecTxClient,
+			Connect:      impl.Connect,
+			Close:        impl.Close,
+			Exec:         impl.Exec,
+			ExecTx:       impl.ExecTx,
+			ExecTxClient: impl.ExecTxClient,
 		}
 		r, err := f(ctx, txClient)
 		if err != nil {
@@ -128,7 +127,7 @@ func (c *ImplTxGormClient) ExecTx(ctx context.Context, f func(ctx context.Contex
 func NewGormClientWithMySQL(username string, password string, host string, dbname string) *GormClient {
 	impl := &ImplGormClient{
 		connectFn: func() (*gorm.DB, error) {
-			return ConnectMySQL(username, password, host, dbname)
+			return ConnectMySQLForGorm(username, password, host, dbname)
 		},
 	}
 	return &GormClient{
@@ -140,14 +139,8 @@ func NewGormClientWithMySQL(username string, password string, host string, dbnam
 	}
 }
 
-func ConnectMySQL(username string, password string, host string, dbname string) (*gorm.DB, error) {
-	q := url.Values{}
-	q.Set("charset", "utf8mb4")
-	q.Set("parseTime", "True")
-	q.Set("loc", "Asia/Tokyo")
-
-	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?%s", username, password, host, dbname, q.Encode())
-
+func ConnectMySQLForGorm(username string, password string, host string, dbname string) (*gorm.DB, error) {
+	dsn := MySQLDsn(username, password, host, dbname)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
